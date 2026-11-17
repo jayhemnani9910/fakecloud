@@ -28,6 +28,7 @@ mod kinesis_lambda_firehose_poller;
 mod lambda_delivery;
 mod lambda_runtime_api;
 mod link_local;
+mod mq_lambda_poller;
 mod pipes_runner;
 mod reaper;
 mod reset;
@@ -488,6 +489,8 @@ async fn main() {
     // into their own SSM / Secrets Manager services below.
     let ssm_state_for_codebuild = ssm_state.clone();
     let secretsmanager_state_for_codebuild = secretsmanager_state.clone();
+    // The Amazon MQ event source mapping poller reads its BASIC_AUTH secrets.
+    let secretsmanager_state_for_mq_esm = secretsmanager_state.clone();
     let s3_state = Arc::new(parking_lot::RwLock::new(
         fakecloud_core::multi_account::MultiAccountState::new(
             &cli.account_id,
@@ -7707,6 +7710,16 @@ async fn main() {
         sqs_lambda_poller = sqs_lambda_poller.with_snapshot_hook(h);
     }
     tokio::spawn(sqs_lambda_poller.run());
+    let mut mq_lambda_poller = mq_lambda_poller::MqLambdaPoller::new(
+        lambda_state.clone(),
+        mq_state.clone(),
+        secretsmanager_state_for_mq_esm,
+    )
+    .with_kms_hook(kms_hook_for_services.clone());
+    if let Some(ref ld) = lambda_delivery {
+        mq_lambda_poller = mq_lambda_poller.with_lambda_delivery(ld.clone());
+    }
+    tokio::spawn(mq_lambda_poller.run());
     let mut kinesis_lambda_firehose_poller =
         KinesisLambdaFirehosePoller::new(kinesis_state.clone(), lambda_invocations_state.clone())
             .with_firehose(firehose_state.clone(), firehose_engine.clone())

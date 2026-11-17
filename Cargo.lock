@@ -5473,6 +5473,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "fakecloud-cognito",
+ "fakecloud-mq",
  "fakecloud-sdk",
  "fakecloud-testkit",
  "flate2",

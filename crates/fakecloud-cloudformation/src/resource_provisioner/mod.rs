@@ -796,7 +796,13 @@ fn parse_lambda_event_source_mapping_props(
     let batch_size = props
         .get("BatchSize")
         .and_then(|v| v.as_i64())
-        .unwrap_or(10);
+        .unwrap_or_else(|| {
+            fakecloud_lambda::esm_config::MappingSource::of(
+                &event_source_arn,
+                props.get("SelfManagedEventSource").is_some(),
+            )
+            .default_batch_size()
+        });
     let enabled = props
         .get("Enabled")
         .and_then(|v| v.as_bool())
